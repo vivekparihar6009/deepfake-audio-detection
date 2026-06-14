@@ -167,6 +167,21 @@ html, body, [class*="css"] {
 .metric-pill .value { font-size: 1.4rem; font-weight: 700; color: #4f8ef7; }
 .metric-pill .label { font-size: 0.75rem; color: var(--text-secondary); }
 
+/* Explanation text and description styles */
+.explanation-text {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    line-height: 1.45;
+    margin-top: 0.6rem;
+    margin-bottom: 1.5rem;
+}
+.metric-desc {
+    font-size: 0.8rem;
+    color: #64748b;
+    line-height: 1.35;
+    margin-top: 0.4rem;
+}
+
 /* Upload area styling */
 [data-testid="stFileUploader"] {
     border: 2px dashed rgba(79,142,247,0.35) !important;
@@ -261,6 +276,16 @@ def get_audio_base64_src(audio_path: str) -> str:
     return f"data:{mime_type};base64,{audio_b64}"
 
 
+def img_to_base64_src(img_path: str) -> str:
+    import base64
+    if os.path.exists(img_path):
+        with open(img_path, 'rb') as f:
+            img_bytes = f.read()
+        img_b64 = base64.b64encode(img_bytes).decode()
+        return f"data:image/png;base64,{img_b64}"
+    return ""
+
+
 # ─── App Layout ────────────────────────────────────────────────────────────────
 
 def main():
@@ -308,95 +333,118 @@ def main():
     except FileNotFoundError:
         st.warning("⚠️ No trained model found at `models/best_model.pt`. Please train the model first: `python src/train.py --data_dir <path>`")
 
-    # ── Upload section ────────────────────────────────────────────────────────
-    st.markdown('<div class="section-label">Upload Audio</div>', unsafe_allow_html=True)
-    uploaded = st.file_uploader(
-        "Drop a voice recording here — WAV, MP3, or FLAC",
-        type=["wav", "mp3", "flac"],
-        label_visibility="collapsed"
-    )
+    # ── Main Tabbed Layout ──────────────────────────────────────────────────
+    tab1, tab2 = st.tabs(["🎙️ Audio Detector", "📈 Model Performance & Metrics"])
 
-    if uploaded is not None:
-        # Save to temp file
-        suffix = '.' + uploaded.name.split('.')[-1]
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp.write(uploaded.read())
-            tmp_path = tmp.name
+    with tab1:
+        # ── Upload section ────────────────────────────────────────────────────
+        st.markdown('<div class="section-label">Upload Audio</div>', unsafe_allow_html=True)
+        uploaded = st.file_uploader(
+            "Drop a voice recording here — WAV, MP3, or FLAC",
+            type=["wav", "mp3", "flac"],
+            label_visibility="collapsed"
+        )
 
-        col1, col2 = st.columns([1.1, 1])
+        if uploaded is not None:
+            # Save to temp file
+            suffix = '.' + uploaded.name.split('.')[-1]
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(uploaded.read())
+                tmp_path = tmp.name
 
-        # ── Left column: audio uploader and visualizations ───────────────────
-        with col1:
-            try:
-                import librosa
-                y_vis, sr_vis = librosa.load(tmp_path, sr=16000, mono=True)
-                
-                audio_src = get_audio_base64_src(tmp_path)
-                fig_wave = plot_waveform(y_vis, sr_vis)
-                wave_src = fig_to_base64_src(fig_wave)
-                
-                fig_spec = plot_spectrogram(y_vis, sr_vis)
-                spec_src = fig_to_base64_src(fig_spec)
+            col1, col2 = st.columns([1.1, 1])
 
-                col1_html = f"""<div class="glass-card">
+            # ── Left column: audio player + visualizations ─────────────────────
+            with col1:
+                try:
+                    import librosa
+                    y_vis, sr_vis = librosa.load(tmp_path, sr=16000, mono=True)
+                    
+                    audio_src = get_audio_base64_src(tmp_path)
+                    fig_wave = plot_waveform(y_vis, sr_vis)
+                    wave_src = fig_to_base64_src(fig_wave)
+                    
+                    fig_spec = plot_spectrogram(y_vis, sr_vis)
+                    spec_src = fig_to_base64_src(fig_spec)
+
+                    col1_html = f"""<div class="glass-card">
 <div class="section-label">🔊 Audio Playback</div>
-<audio src="{audio_src}" controls style="width:100%; margin-bottom:1.5rem; border-radius: 8px;"></audio>
-<div class="section-label" style="margin-top:1rem;">Waveform</div>
-<img src="{wave_src}" style="width:100%; border-radius:8px; margin-bottom:1.5rem;" />
-<div class="section-label">Log-Mel Spectrogram</div>
+<audio src="{audio_src}" controls style="width:100%; margin-bottom:1.2rem; border-radius: 8px;"></audio>
+
+<div class="section-label" style="margin-top:1.5rem;">Waveform (Time vs. Amplitude)</div>
+<img src="{wave_src}" style="width:100%; border-radius:8px;" />
+<div class="explanation-text">
+    <strong>What it shows:</strong> The waveform represents the audio signal's amplitude over time. 
+    Natural human speech typically displays variable amplitude patterns with clear gaps and dynamic rhythm, 
+    whereas synthetic audio might show overly uniform envelopes, flat levels, or abrupt transitions.
+</div>
+
+<div class="section-label" style="margin-top:1.5rem;">Log-Mel Spectrogram (Time vs. Frequency)</div>
 <img src="{spec_src}" style="width:100%; border-radius:8px;" />
+<div class="explanation-text">
+    <strong>What it shows:</strong> A spectrogram visualizes frequency energy distribution over time on a Mel-scale (which matches human hearing perception). 
+    Deep learning models analyze this feature to find microscopic artifacts—such as high-frequency cutoffs, phase distortions, 
+    or artificial gaps—left behind by speech synthesizers.
+</div>
 </div>"""
-                st.markdown(col1_html, unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"Visualization error: {e}")
+                    st.markdown(col1_html, unsafe_allow_html=True)
+                except Exception as e:
+                    st.error(f"Visualization error: {e}")
 
-        # ── Right column: prediction results ─────────────────────────────────
-        with col2:
-            if model_loaded:
-                with st.spinner("Analyzing audio..."):
-                    try:
-                        import importlib
-                        import predict
-                        importlib.reload(predict)
-                        from predict import predict as run_predict
-                        result = run_predict(
-                            audio_path=tmp_path,
-                            checkpoint_path=os.path.join(os.path.dirname(__file__), '..', 'models', 'best_model.pt'),
-                            model=model
-                        )
+            # ── Right column: prediction results ─────────────────────────────
+            with col2:
+                if model_loaded:
+                    with st.spinner("Analyzing audio..."):
+                        try:
+                            import importlib
+                            import predict
+                            importlib.reload(predict)
+                            from predict import predict as run_predict
+                            result = run_predict(
+                                audio_path=tmp_path,
+                                checkpoint_path=os.path.join(os.path.dirname(__file__), '..', 'models', 'best_model.pt'),
+                                model=model
+                            )
 
-                        label      = result['label']
-                        confidence = result['confidence']
-                        is_fake    = result['label_id'] == 1
-                        gen_prob   = result['genuine_prob']
-                        fake_prob  = result['deepfake_prob']
+                            label      = result['label']
+                            confidence = result['confidence']
+                            is_fake    = result['label_id'] == 1
+                            gen_prob   = result['genuine_prob']
+                            fake_prob  = result['deepfake_prob']
 
-                        # Result badge styling
-                        badge_class = 'result-badge-deepfake' if is_fake else 'result-badge-genuine'
-                        icon = '⚠️' if is_fake else '✅'
-                        bar_class = 'conf-bar-fill-deepfake' if is_fake else 'conf-bar-fill-genuine'
-                        text_color = '#ef4444' if is_fake else '#10b981'
-                        
-                        interpretation_html = f"""<div style="background-color: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 1rem; border-radius: 8px; color: #fca5a5; margin-top: 1.2rem; font-size:0.9rem;">
+                            # Result badge styling
+                            badge_class = 'result-badge-deepfake' if is_fake else 'result-badge-genuine'
+                            icon = '⚠️' if is_fake else '✅'
+                            bar_class = 'conf-bar-fill-deepfake' if is_fake else 'conf-bar-fill-genuine'
+                            text_color = '#ef4444' if is_fake else '#10b981'
+                            
+                            interpretation_html = f"""<div style="background-color: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 1rem; border-radius: 8px; color: #fca5a5; margin-top: 1.2rem; font-size:0.9rem;">
 ⚠️ <strong>Deepfake Detected</strong> — This audio appears to be AI-generated or voice-cloned.
 </div>""" if is_fake else f"""<div style="background-color: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 1rem; border-radius: 8px; color: #6ee7b7; margin-top: 1.2rem; font-size:0.9rem;">
 ✅ <strong>Genuine Voice</strong> — This audio appears to be authentic human speech.
 </div>"""
 
-                        col2_html = f"""<div class="glass-card">
+                            col2_html = f"""<div class="glass-card">
 <div class="section-label">🔍 Analysis Result</div>
+
 <div style="text-align:center;margin:1.5rem 0;">
 <span class="{badge_class}">{icon} {label}</span>
 </div>
+
 <div style="text-align:center;font-size:2.5rem;font-weight:700;color:{text_color};line-height:1.2;">
 {confidence:.1f}%
 </div>
-<div style="text-align:center;color:#94a3b8;font-size:0.85rem;margin-bottom:1rem;">
+<div style="text-align:center;color:#94a3b8;font-size:0.85rem;margin-bottom:0.2rem;">
 Confidence
 </div>
+<div class="metric-desc" style="text-align:center; margin-bottom:1rem; padding:0 1.5rem;">
+The model's probability score for the detected class. Higher confidence indicates stronger network validation.
+</div>
+
 <div class="conf-bar-container">
 <div class="{bar_class}" style="width:{confidence}%"></div>
 </div>
+
 <div style="margin-top:1.8rem">
 <div class="section-label">Probability Breakdown</div>
 <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
@@ -409,34 +457,102 @@ Confidence
 <div class="label">Deepfake</div>
 </div>
 </div>
+<div class="metric-desc" style="margin-top: 0.6rem; padding:0 0.5rem;">
+Shows the probability distribution: <strong>Genuine</strong> (human vocal tract production) vs. <strong>Deepfake</strong> (speech synthesizers).
 </div>
+</div>
+
 {interpretation_html}
 </div>"""
-                        st.markdown(col2_html, unsafe_allow_html=True)
-                    except Exception as e:
-                        st.error(f"Inference error: {e}")
-            else:
-                st.info("Model not loaded. Please train the model first.")
+                            st.markdown(col2_html, unsafe_allow_html=True)
+                        except Exception as e:
+                            st.error(f"Inference error: {e}")
+                else:
+                    st.info("Model not loaded. Please train the model first.")
 
-        # Cleanup temp file
-        try:
-            os.unlink(tmp_path)
-        except Exception:
-            pass
+            # Cleanup temp file
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
 
-    else:
-        # Empty state
-        st.markdown("""
-        <div class="glass-card" style="text-align:center;padding:3rem;">
-            <div style="font-size:3rem;margin-bottom:1rem;">🎤</div>
-            <div style="font-size:1.1rem;color:#94a3b8;margin-bottom:0.5rem;">
-                Upload an audio file to begin analysis
+        else:
+            # Empty state
+            st.markdown("""
+            <div class="glass-card" style="text-align:center;padding:3rem;">
+                <div style="font-size:3rem;margin-bottom:1rem;">🎤</div>
+                <div style="font-size:1.1rem;color:#94a3b8;margin-bottom:0.5rem;">
+                    Upload an audio file to begin analysis
+                </div>
+                <div style="font-size:0.85rem;color:#475569;">
+                    Supported formats: WAV · MP3 · FLAC
+                </div>
             </div>
-            <div style="font-size:0.85rem;color:#475569;">
-                Supported formats: WAV · MP3 · FLAC
-            </div>
+            """, unsafe_allow_html=True)
+
+    with tab2:
+        # ── Model Performance & Metrics ──────────────────────────────────────
+        REPORTS_DIR = os.path.join(os.path.dirname(__file__), '..', 'reports')
+        cm_path = os.path.join(REPORTS_DIR, 'confusion_matrix_testing.png')
+        roc_path = os.path.join(REPORTS_DIR, 'roc_curve_testing.png')
+        det_path = os.path.join(REPORTS_DIR, 'det_curve_testing.png')
+
+        cm_src = img_to_base64_src(cm_path)
+        roc_src = img_to_base64_src(roc_path)
+        det_src = img_to_base64_src(det_path)
+
+        performance_html = f"""<div class="glass-card">
+<div style="font-size: 1.8rem; font-weight: 700; margin-bottom: 0.5rem; background: linear-gradient(135deg, #4f8ef7, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+📊 Model Performance Metrics
+</div>
+<div class="explanation-text" style="margin-bottom: 1.5rem;">
+The deep learning model is a hybrid <strong>CNN-BiLSTM</strong> structure trained on <strong>53,868 speech clips</strong>. It maps spatial features from 2D spectrograms using Convolutional layers, and sequential context over time using a Bidirectional LSTM.
+</div>
+
+<div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+    <div class="metric-pill" style="flex: 1;">
+        <div class="value">94.04%</div>
+        <div class="label">Overall Accuracy</div>
+    </div>
+    <div class="metric-pill" style="flex: 1;">
+        <div class="value">5.95%</div>
+        <div class="label">Equal Error Rate (EER)</div>
+    </div>
+    <div class="metric-pill" style="flex: 1;">
+        <div class="value">94.17%</div>
+        <div class="label">F1-Score</div>
+    </div>
+</div>
+
+<div class="section-label" style="margin-bottom: 1rem;">Performance Verification Plots</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 1.5rem;">
+    <div style="flex: 1; min-width: 280px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 1rem;">
+        <div class="section-label" style="text-align:center; font-size:0.85rem; margin-bottom: 0.8rem;">1. Confusion Matrix</div>
+        <img src="{cm_src}" style="width:100%; border-radius:8px;" />
+        <div class="explanation-text" style="font-size: 0.8rem; margin-bottom: 0;">
+            <strong>Interpretation:</strong> Displays the distribution of correct vs. incorrect classifications. The diagonal boxes show correct predictions (Genuine classified as Genuine, Deepfake classified as Deepfake).
         </div>
-        """, unsafe_allow_html=True)
+    </div>
+    
+    <div style="flex: 1; min-width: 280px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 1rem;">
+        <div class="section-label" style="text-align:center; font-size:0.85rem; margin-bottom: 0.8rem;">2. ROC Curve (AUC = 0.985)</div>
+        <img src="{roc_src}" style="width:100%; border-radius:8px;" />
+        <div class="explanation-text" style="font-size: 0.8rem; margin-bottom: 0;">
+            <strong>Interpretation:</strong> Plots the True Positive Rate vs. False Positive Rate. The closer the blue curve sweeps to the top-left corner (Area Under Curve &approx; 1.0), the more robust the classifier.
+        </div>
+    </div>
+    
+    <div style="flex: 1; min-width: 280px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 1rem;">
+        <div class="section-label" style="text-align:center; font-size:0.85rem; margin-bottom: 0.8rem;">3. DET Curve (EER = 5.95%)</div>
+        <img src="{det_src}" style="width:100%; border-radius:8px;" />
+        <div class="explanation-text" style="font-size: 0.8rem; margin-bottom: 0;">
+            <strong>Interpretation:</strong> Plots False Acceptance Rate against False Rejection Rate. The intersection point marks the **Equal Error Rate (EER)** where both errors are equal.
+        </div>
+    </div>
+</div>
+</div>"""
+        st.markdown(performance_html, unsafe_allow_html=True)
 
     # ── Footer ────────────────────────────────────────────────────────────────
     st.markdown("---")
