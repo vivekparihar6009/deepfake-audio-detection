@@ -182,8 +182,8 @@ def create_notebook():
                 "outputs": [],
                 "source": [
                     "# Display ROC & Confusion Matrix plots\n",
-                    "display(Image('reports/roc_curve.png'))\n",
-                    "display(Image('reports/confusion_matrix.png'))"
+                    "display(Image('reports/roc_curve_testing.png'))\n",
+                    "display(Image('reports/confusion_matrix_testing.png'))"
                 ]
             },
             {
