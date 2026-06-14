@@ -127,7 +127,7 @@ Performance on the **testing split** after full training:
 ### Prerequisites
 ```bash
 # Clone repository
-git clone https://github.com/YourUser/deepfake-audio-detection.git
+git clone https://github.com/vivekparihar6009/deepfake-audio-detection.git
 cd deepfake-audio-detection
 
 # Create virtual environment
