@@ -37,7 +37,7 @@ def create_notebook():
                 "outputs": [],
                 "source": [
                     "# Clone repo (adjust URL if needed)\n",
-                    "!git clone https://github.com/Antigravity-AI/deepfake-audio-detection.git\n",
+                    "!git clone https://github.com/vivekparihar6009/deepfake-audio-detection.git\n",
                     "%cd deepfake-audio-detection"
                 ]
             },
